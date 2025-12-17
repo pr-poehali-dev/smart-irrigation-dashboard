@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useWebSocket } from '@/hooks/useWebSocket';
+import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
@@ -35,6 +37,7 @@ interface Zone {
 }
 
 const Index = () => {
+  const [wsUrl, setWsUrl] = useState('ws://192.168.1.100:81');
   const [zones, setZones] = useState<Zone[]>([
     { id: 1, name: 'Газон передний', active: true, moisture: 72, temperature: 24, lastWatered: '2 часа назад' },
     { id: 2, name: 'Цветник', active: true, moisture: 68, temperature: 23, lastWatered: '1 час назад' },
@@ -42,10 +45,54 @@ const Index = () => {
     { id: 4, name: 'Газон задний', active: true, moisture: 75, temperature: 22, lastWatered: '30 минут назад' },
   ]);
 
+  const { isConnected, lastMessage, sendMessage } = useWebSocket({
+    url: wsUrl,
+    onConnect: () => {
+      toast.success('Подключено к ESP32', {
+        description: 'Данные обновляются в реальном времени',
+      });
+    },
+    onDisconnect: () => {
+      toast.error('Соединение потеряно', {
+        description: 'Попытка переподключения...',
+      });
+    },
+    onMessage: (data) => {
+      if (data.type === 'sensor_data') {
+        updateZoneData(data.data);
+      }
+    },
+  });
+
+  const updateZoneData = (data: any) => {
+    if (data.zoneId !== undefined) {
+      setZones(prevZones =>
+        prevZones.map(zone =>
+          zone.id === data.zoneId
+            ? {
+                ...zone,
+                moisture: data.moisture ?? zone.moisture,
+                temperature: data.temperature ?? zone.temperature,
+                active: data.active ?? zone.active,
+              }
+            : zone
+        )
+      );
+    }
+  };
+
   const toggleZone = (id: number) => {
-    setZones(zones.map(zone => 
-      zone.id === id ? { ...zone, active: !zone.active } : zone
-    ));
+    const zone = zones.find(z => z.id === id);
+    if (zone) {
+      sendMessage({
+        type: 'toggle_zone',
+        zoneId: id,
+        active: !zone.active,
+      });
+      setZones(zones.map(z => 
+        z.id === id ? { ...z, active: !z.active } : z
+      ));
+    }
   };
 
   const getMoistureColor = (moisture: number) => {
@@ -64,8 +111,18 @@ const Index = () => {
     <div className="min-h-screen bg-background p-4 md:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
         <header className="animate-fade-in">
-          <h1 className="text-4xl font-bold text-foreground mb-2">Система автополива</h1>
-          <p className="text-muted-foreground">Мониторинг и управление зонами полива в реальном времени</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-4xl font-bold text-foreground mb-2">Система автополива</h1>
+              <p className="text-muted-foreground">Мониторинг и управление зонами полива в реальном времени</p>
+            </div>
+            <div className="flex items-center gap-2 px-4 py-2 rounded-lg border bg-card">
+              <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-secondary animate-pulse' : 'bg-gray-400'}`} />
+              <span className="text-sm font-medium">
+                {isConnected ? 'ESP32 подключён' : 'Нет соединения'}
+              </span>
+            </div>
+          </div>
         </header>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

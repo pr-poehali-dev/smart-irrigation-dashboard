@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,6 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import Icon from '@/components/ui/icon';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { AuthForm } from '@/components/AuthForm';
+import { UserMenu } from '@/components/UserMenu';
 
 const waterUsageData = [
   { day: 'Пн', usage: 45 },
@@ -19,12 +21,12 @@ const waterUsageData = [
 ];
 
 const moistureData = [
-  { time: '00:00', zone1: 65, zone2: 72, zone3: 58 },
-  { time: '04:00', zone1: 62, zone2: 68, zone3: 55 },
-  { time: '08:00', zone1: 70, zone2: 75, zone3: 65 },
-  { time: '12:00', zone1: 68, zone2: 73, zone3: 62 },
-  { time: '16:00', zone1: 65, zone2: 70, zone3: 60 },
-  { time: '20:00', zone1: 72, zone2: 78, zone3: 68 },
+  { time: '00:00', zone1: 65, zone2: 72, zone3: 58, zone4: 68, zone5: 55, zone6: 71, zone7: 62, zone8: 70 },
+  { time: '04:00', zone1: 62, zone2: 68, zone3: 55, zone4: 65, zone5: 52, zone6: 68, zone7: 59, zone8: 67 },
+  { time: '08:00', zone1: 70, zone2: 75, zone3: 65, zone4: 72, zone5: 62, zone6: 76, zone7: 68, zone8: 74 },
+  { time: '12:00', zone1: 68, zone2: 73, zone3: 62, zone4: 70, zone5: 60, zone6: 74, zone7: 66, zone8: 72 },
+  { time: '16:00', zone1: 65, zone2: 70, zone3: 60, zone4: 67, zone5: 58, zone6: 71, zone7: 64, zone8: 69 },
+  { time: '20:00', zone1: 72, zone2: 78, zone3: 68, zone4: 75, zone5: 65, zone6: 79, zone7: 71, zone8: 77 },
 ];
 
 interface Zone {
@@ -36,16 +38,28 @@ interface Zone {
   lastWatered: string;
 }
 
+interface User {
+  username: string;
+  email: string;
+  zones: Zone[];
+}
+
 const Index = () => {
-  const [wsUrl, setWsUrl] = useState('ws://192.168.1.100:81');
+  const [user, setUser] = useState<User | null>(null);
+  const [wsUrl] = useState('ws://192.168.1.100:81');
+  
   const [zones, setZones] = useState<Zone[]>([
     { id: 1, name: 'Газон передний', active: true, moisture: 72, temperature: 24, lastWatered: '2 часа назад' },
     { id: 2, name: 'Цветник', active: true, moisture: 68, temperature: 23, lastWatered: '1 час назад' },
     { id: 3, name: 'Огород', active: false, moisture: 55, temperature: 25, lastWatered: '5 часов назад' },
     { id: 4, name: 'Газон задний', active: true, moisture: 75, temperature: 22, lastWatered: '30 минут назад' },
+    { id: 5, name: 'Теплица', active: false, moisture: 58, temperature: 28, lastWatered: '4 часа назад' },
+    { id: 6, name: 'Клумба входная', active: true, moisture: 71, temperature: 23, lastWatered: '1.5 часа назад' },
+    { id: 7, name: 'Сад фруктовый', active: true, moisture: 69, temperature: 24, lastWatered: '2.5 часа назад' },
+    { id: 8, name: 'Розарий', active: false, moisture: 52, temperature: 22, lastWatered: '6 часов назад' },
   ]);
 
-  const { isConnected, lastMessage, sendMessage } = useWebSocket({
+  const { isConnected, sendMessage } = useWebSocket({
     url: wsUrl,
     onConnect: () => {
       toast.success('Подключено к ESP32', {
@@ -81,6 +95,37 @@ const Index = () => {
     }
   };
 
+  const handleLogin = (username: string, password: string) => {
+    const mockUser: User = {
+      username,
+      email: `${username}@example.com`,
+      zones: zones,
+    };
+    setUser(mockUser);
+    toast.success('Вход выполнен', {
+      description: `Добро пожаловать, ${username}!`,
+    });
+  };
+
+  const handleRegister = (username: string, password: string, email: string) => {
+    const mockUser: User = {
+      username,
+      email,
+      zones: zones,
+    };
+    setUser(mockUser);
+    toast.success('Регистрация завершена', {
+      description: 'Добро пожаловать в систему!',
+    });
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    toast.info('Выход выполнен', {
+      description: 'До скорой встречи!',
+    });
+  };
+
   const toggleZone = (id: number) => {
     const zone = zones.find(z => z.id === id);
     if (zone) {
@@ -107,6 +152,10 @@ const Index = () => {
     return 'Низкая';
   };
 
+  if (!user) {
+    return <AuthForm onLogin={handleLogin} onRegister={handleRegister} />;
+  }
+
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
@@ -116,11 +165,14 @@ const Index = () => {
               <h1 className="text-4xl font-bold text-foreground mb-2">Система автополива</h1>
               <p className="text-muted-foreground">Мониторинг и управление зонами полива в реальном времени</p>
             </div>
-            <div className="flex items-center gap-2 px-4 py-2 rounded-lg border bg-card">
-              <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-secondary animate-pulse' : 'bg-gray-400'}`} />
-              <span className="text-sm font-medium">
-                {isConnected ? 'ESP32 подключён' : 'Нет соединения'}
-              </span>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 px-4 py-2 rounded-lg border bg-card">
+                <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-secondary animate-pulse' : 'bg-gray-400'}`} />
+                <span className="text-sm font-medium">
+                  {isConnected ? 'ESP32 подключён' : 'Нет соединения'}
+                </span>
+              </div>
+              <UserMenu username={user.username} email={user.email} onLogout={handleLogout} />
             </div>
           </div>
         </header>
@@ -197,14 +249,15 @@ const Index = () => {
             <CardContent>
               <ResponsiveContainer width="100%" height={250}>
                 <BarChart data={waterUsageData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis dataKey="day" stroke="#64748b" />
-                  <YAxis stroke="#64748b" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                  <XAxis dataKey="day" stroke="#9ca3af" />
+                  <YAxis stroke="#9ca3af" />
                   <Tooltip 
                     contentStyle={{ 
-                      backgroundColor: 'white', 
-                      border: '1px solid #e5e7eb',
-                      borderRadius: '8px'
+                      backgroundColor: '#1f2937', 
+                      border: '1px solid #374151',
+                      borderRadius: '8px',
+                      color: '#f3f4f6'
                     }}
                   />
                   <Bar dataKey="usage" fill="#0ea5e9" radius={[8, 8, 0, 0]} />
@@ -224,19 +277,21 @@ const Index = () => {
             <CardContent>
               <ResponsiveContainer width="100%" height={250}>
                 <LineChart data={moistureData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis dataKey="time" stroke="#64748b" />
-                  <YAxis stroke="#64748b" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                  <XAxis dataKey="time" stroke="#9ca3af" />
+                  <YAxis stroke="#9ca3af" />
                   <Tooltip 
                     contentStyle={{ 
-                      backgroundColor: 'white', 
-                      border: '1px solid #e5e7eb',
-                      borderRadius: '8px'
+                      backgroundColor: '#1f2937', 
+                      border: '1px solid #374151',
+                      borderRadius: '8px',
+                      color: '#f3f4f6'
                     }}
                   />
                   <Line type="monotone" dataKey="zone1" stroke="#0ea5e9" strokeWidth={2} />
                   <Line type="monotone" dataKey="zone2" stroke="#10b981" strokeWidth={2} />
                   <Line type="monotone" dataKey="zone3" stroke="#f59e0b" strokeWidth={2} />
+                  <Line type="monotone" dataKey="zone4" stroke="#8b5cf6" strokeWidth={2} />
                 </LineChart>
               </ResponsiveContainer>
             </CardContent>
@@ -252,7 +307,7 @@ const Index = () => {
             <CardDescription>Включение/выключение и мониторинг состояния</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {zones.map((zone) => (
                 <div 
                   key={zone.id} 
@@ -260,7 +315,7 @@ const Index = () => {
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-3">
-                      <div className={`w-3 h-3 rounded-full ${zone.active ? 'bg-secondary animate-pulse' : 'bg-gray-300'}`} />
+                      <div className={`w-3 h-3 rounded-full ${zone.active ? 'bg-secondary animate-pulse' : 'bg-gray-600'}`} />
                       <div>
                         <h3 className="font-semibold text-foreground">{zone.name}</h3>
                         <p className="text-xs text-muted-foreground">{zone.lastWatered}</p>
@@ -316,10 +371,11 @@ const Index = () => {
                 {[
                   { name: 'Датчик влажности #1', status: 'online', type: 'sensor' },
                   { name: 'Датчик влажности #2', status: 'online', type: 'sensor' },
+                  { name: 'Датчик влажности #3', status: 'online', type: 'sensor' },
                   { name: 'Датчик температуры', status: 'online', type: 'sensor' },
                   { name: 'Главный клапан', status: 'online', type: 'valve' },
-                  { name: 'Клапан зоны 1', status: 'online', type: 'valve' },
-                  { name: 'Клапан зоны 2', status: 'warning', type: 'valve' },
+                  { name: 'Клапан зоны 1-4', status: 'online', type: 'valve' },
+                  { name: 'Клапан зоны 5-8', status: 'online', type: 'valve' },
                 ].map((device, idx) => (
                   <div key={idx} className="flex items-center justify-between p-3 rounded-lg border">
                     <div className="flex items-center gap-3">
@@ -351,7 +407,7 @@ const Index = () => {
               <div className="space-y-3">
                 {[
                   { text: 'Зона "Газон передний" полив завершён', time: '2 часа назад', type: 'success' },
-                  { text: 'Низкая влажность в зоне "Огород"', time: '3 часа назад', type: 'warning' },
+                  { text: 'Низкая влажность в зоне "Розарий"', time: '3 часа назад', type: 'warning' },
                   { text: 'Система запущена успешно', time: '6 часов назад', type: 'info' },
                   { text: 'Датчик температуры обновлён', time: '12 часов назад', type: 'info' },
                   { text: 'Еженедельная проверка завершена', time: '1 день назад', type: 'success' },

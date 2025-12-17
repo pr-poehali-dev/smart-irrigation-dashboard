@@ -9,6 +9,8 @@ import Icon from '@/components/ui/icon';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { AuthForm } from '@/components/AuthForm';
 import { UserMenu } from '@/components/UserMenu';
+import { EditZoneDialog } from '@/components/EditZoneDialog';
+import { Button } from '@/components/ui/button';
 
 const waterUsageData = [
   { day: 'Пн', usage: 45 },
@@ -47,6 +49,7 @@ interface User {
 const Index = () => {
   const [user, setUser] = useState<User | null>(null);
   const [wsUrl] = useState('ws://192.168.1.100:81');
+  const [editingZone, setEditingZone] = useState<Zone | null>(null);
   
   const [zones, setZones] = useState<Zone[]>([
     { id: 1, name: 'Газон передний', active: true, moisture: 72, temperature: 24, lastWatered: '2 часа назад' },
@@ -137,6 +140,17 @@ const Index = () => {
       setZones(zones.map(z => 
         z.id === id ? { ...z, active: !z.active } : z
       ));
+    }
+  };
+
+  const handleRenameZone = (newName: string) => {
+    if (editingZone) {
+      setZones(zones.map(z => 
+        z.id === editingZone.id ? { ...z, name: newName } : z
+      ));
+      toast.success('Зона переименована', {
+        description: `Новое название: ${newName}`,
+      });
     }
   };
 
@@ -314,10 +328,20 @@ const Index = () => {
                   className="p-4 rounded-lg border bg-card hover:shadow-md transition-all"
                 >
                   <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 flex-1">
                       <div className={`w-3 h-3 rounded-full ${zone.active ? 'bg-secondary animate-pulse' : 'bg-gray-600'}`} />
-                      <div>
-                        <h3 className="font-semibold text-foreground">{zone.name}</h3>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold text-foreground">{zone.name}</h3>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0"
+                            onClick={() => setEditingZone(zone)}
+                          >
+                            <Icon name="Edit2" size={14} className="text-muted-foreground hover:text-primary" />
+                          </Button>
+                        </div>
                         <p className="text-xs text-muted-foreground">{zone.lastWatered}</p>
                       </div>
                     </div>
@@ -432,6 +456,13 @@ const Index = () => {
             </CardContent>
           </Card>
         </div>
+
+        <EditZoneDialog
+          open={!!editingZone}
+          onOpenChange={(open) => !open && setEditingZone(null)}
+          zoneName={editingZone?.name || ''}
+          onSave={handleRenameZone}
+        />
       </div>
     </div>
   );
